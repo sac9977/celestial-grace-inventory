@@ -1,0 +1,251 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  name      String
+  password  String
+  role      Role     @default(STAFF)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum Role {
+  ADMIN
+  STAFF
+}
+
+model Product {
+  id           String   @id @default(uuid())
+  sku          String   @unique
+  name         String
+  description  String?
+  category     String
+  costPrice    Float
+  sellingPrice Float
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  variants     ProductVariant[]
+  inventory    InventoryItem?
+  salesOrderItems SalesOrderItem[]
+}
+
+model ProductVariant {
+  id        String   @id @default(uuid())
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  color     String
+  material  String
+  size      String?
+  sku       String   @unique
+  createdAt DateTime @default(now())
+
+  bomEntries ProductBOM[]
+  inventory InventoryItem?
+  salesOrderItems SalesOrderItem[]
+}
+
+model InventoryItem {
+  id              String   @id @default(uuid())
+  productId       String   @unique
+  product         Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variantId       String?  @unique
+  variant         ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+  quantity        Int      @default(0)
+  lowStockThreshold Int    @default(5)
+  updatedAt       DateTime @updatedAt
+
+  @@unique([productId, variantId])
+}
+
+model RawMaterial {
+  id              String   @id @default(uuid())
+  name            String
+  category        String
+  unit            String
+  costPerUnit     Float
+  lowStockThreshold Int    @default(10)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  purchaseOrders  PurchaseOrderItem[]
+  bomEntries      ProductBOM[]
+  consumptionLogs ConsumptionLog[]
+}
+
+model Supplier {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  contact     String?
+  email       String?
+  phone       String?
+  address     String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  purchaseOrders PurchaseOrder[]
+}
+
+model PurchaseOrder {
+  id             String   @id @default(uuid())
+  supplierId     String
+  supplier       Supplier @relation(fields: [supplierId], references: [id])
+  reference      String
+  invoiceNo      String?
+  billType       String?
+  category       String?
+  status         POStatus @default(PENDING)
+  paymentStatus  PaymentStatus @default(UNPAID)
+  subtotal       Float?
+  taxAmount      Float?
+  grandTotal     Float?
+  notes          String?
+  createdAt      DateTime @default(now())
+  receivedAt     DateTime?
+  updatedAt      DateTime @updatedAt
+
+  items          PurchaseOrderItem[]
+}
+
+enum POStatus {
+  PENDING
+  PARTIALLY_RECEIVED
+  RECEIVED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  UNPAID
+  PARTIAL
+  PAID
+  REFUNDED
+}
+
+model PurchaseOrderItem {
+  id              String   @id @default(uuid())
+  purchaseOrderId String
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  rawMaterialId   String
+  rawMaterial     RawMaterial @relation(fields: [rawMaterialId], references: [id])
+  quantity        Float
+  costPerUnit     Float
+  amount          Float
+  gstPercent      Float?
+  receivedQty     Float   @default(0)
+  status          String?
+  createdAt       DateTime @default(now())
+
+  @@unique([purchaseOrderId, rawMaterialId])
+}
+
+model ProductBOM {
+  id              String   @id @default(uuid())
+  productVariantId String
+  productVariant  ProductVariant @relation(fields: [productVariantId], references: [id], onDelete: Cascade)
+  rawMaterialId   String
+  rawMaterial     RawMaterial @relation(fields: [rawMaterialId], references: [id])
+  componentType   String?
+  quantityPerUnit Float
+  unit            String
+  meters          Float?
+  wastagePercent  Float?
+  netConsumption  Float?
+  wastageCalc     Float?
+  rateCostPerBag  Float?
+  sourceSheet     String?
+  notes           String?
+  createdAt       DateTime @default(now())
+
+  @@unique([productVariantId, rawMaterialId])
+}
+
+model ConsumptionLog {
+  id             String   @id @default(uuid())
+  rawMaterialId  String
+  rawMaterial    RawMaterial @relation(fields: [rawMaterialId], references: [id])
+  quantity       Float
+  reason         String
+  relatedOrderId String?
+  createdAt      DateTime @default(now())
+  createdBy      String
+}
+
+model Customer {
+  id        String   @id @default(uuid())
+  name      String
+  email     String?
+  phone     String?
+  address   String?
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  salesOrders SalesOrder[]
+}
+
+model SalesOrder {
+  id           String   @id @default(uuid())
+  customerId   String
+  customer     Customer @relation(fields: [customerId], references: [id])
+  orderStatus  SOStatus @default(PENDING)
+  paymentStatus PaymentStatus @default(UNPAID)
+  totalAmount  Float
+  notes        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  createdBy    String
+
+  items        SalesOrderItem[]
+}
+
+enum SOStatus {
+  PENDING
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
+model SalesOrderItem {
+  id            String   @id @default(uuid())
+  salesOrderId  String
+  salesOrder    SalesOrder @relation(fields: [salesOrderId], references: [id], onDelete: Cascade)
+  productId     String
+  product       Product   @relation(fields: [productId], references: [id])
+  variantId     String?
+  variant       ProductVariant? @relation(fields: [variantId], references: [id])
+  quantity      Int
+  unitPrice     Float
+  createdAt     DateTime @default(now())
+
+  @@unique([salesOrderId, productId, variantId])
+}
+
+model InventoryMovement {
+  id             String   @id @default(uuid())
+  type           MovementType
+  productId      String?
+  variantId      String?
+  rawMaterialId  String?
+  quantity       Float
+  reason         String
+  relatedOrderId String?
+  createdAt      DateTime @default(now())
+  createdBy      String
+}
+
+enum MovementType {
+  SALE_RESTOCK
+  PRODUCTION_CONSUMPTION
+  ADJUSTMENT
+  PO_RECEIPT
+}
