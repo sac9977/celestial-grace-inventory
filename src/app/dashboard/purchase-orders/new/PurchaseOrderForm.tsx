@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { createPurchaseOrder } from "@/app/(dashboard)/purchase-orders/new/actions"
+import { createPurchaseOrder } from "@/app/dashboard/purchase-orders/new/actions"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 

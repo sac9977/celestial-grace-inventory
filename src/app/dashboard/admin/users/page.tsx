@@ -15,7 +15,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Users, UserCog } from "lucide-react"
 import AddUserDialog from "../AddUserDialog"
-import { UserActions } from "@/app/(dashboard)/admin/UserActions"
+import { UserActions } from "@/app/dashboard/admin/UserActions"
 
 async function getUsers() {
   const users = await prisma.user.findMany({
