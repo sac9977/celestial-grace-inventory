@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Celestial Grace Inventory</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <aside class="sidebar">
+    <h2>Celestial Grace</h2>
+    <p>Inventory</p>
+    <nav>
+      <a href="/">Dashboard</a>
+      <a href="/products" data-roles="ADMIN,STAFF">Products</a>
+      <a href="/raw-materials" data-roles="ADMIN,STAFF">Raw Materials</a>
+      <a href="/suppliers" data-roles="ADMIN">Suppliers</a>
+      <a href="/purchase-orders" data-roles="ADMIN">Purchase Orders</a>
+      <a href="/customers" data-roles="ADMIN,STAFF">Customers</a>
+      <a href="/sales-orders" data-roles="ADMIN,STAFF">Sales Orders</a>
+      <a href="/inventory" data-roles="ADMIN,STAFF">Inventory</a>
+      <a href="/bom" data-roles="ADMIN">BOM</a>
+      <a href="/import" data-roles="ADMIN">Import</a>
+      <a href="/admin" data-roles="ADMIN">Admin</a>
+    </nav>
+    <div style="margin-top:auto; padding-top:16px; border-top:1px solid #e5e7eb;">
+      <p style="font-size:13px; font-weight:500;" id="userName"></p>
+      <p style="font-size:11px; color:#6b7280;" id="userRole"></p>
+      <button class="btn" style="width:100%; margin-top:8px;" onclick="logout()">Logout</button>
+    </div>
+  </aside>
+  <main class="main">
+    <div class="top-bar">
+      <h1>Dashboard</h1>
+    </div>
+    <div class="grid grid-4" id="statsGrid">
+      <div class="card"><h3>Total Products</h3><div class="value" id="statProducts">-</div></div>
+      <div class="card"><h3>Low Stock Alerts</h3><div class="value" id="statLowStock">-</div></div>
+      <div class="card"><h3>Pending POs</h3><div class="value" id="statPendingPOs">-</div></div>
+      <div class="card"><h3>Recent Orders</h3><div class="value" id="statRecentOrders">-</div></div>
+    </div>
+    <div class="grid grid-2">
+      <div class="card">
+        <h3>Low Stock Items</h3>
+        <div id="lowStockList">Loading...</div>
+      </div>
+      <div class="card">
+        <h3>Recent Sales Orders</h3>
+        <div id="recentOrdersList">Loading...</div>
+      </div>
+    </div>
+  </main>
+  <script src="/js/api.js"></script>
+  <script src="/js/app.js"></script>
+  <script>
+    async function loadDashboard() {
+      try {
+        const products = await api.get("/api/products");
+        const inventory = await api.get("/api/inventory");
+        const pos = await api.get("/api/purchase-orders");
+        const orders = await api.get("/api/sales-orders");
+        
+        document.getElementById("statProducts").textContent = (products || []).length;
+        document.getElementById("statLowStock").textContent = (inventory || []).filter(i => i.quantity <= i.lowStockThreshold).length;
+        document.getElementById("statPendingPOs").textContent = (pos || []).filter(p => p.status === "PENDING" || p.status === "PARTIALLY_RECEIVED").length;
+        document.getElementById("statRecentOrders").textContent = (orders || []).length;
+        
+        const lowStock = (inventory || []).filter(i => i.quantity <= i.lowStockThreshold).slice(0, 5);
+        document.getElementById("lowStockList").innerHTML = lowStock.length === 0 ?
+          '<p style="color:#6b7280; font-size:14px;">No low stock items</p>' :
+          lowStock.map(i => `<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #e5e7eb;">
+            <div><div style="font-weight:500;">${i.product?.name || "-"}</div><div style="font-size:12px;color:#6b7280;">${i.variant ? i.variant.color + " / " + i.variant.material : "Default"}</div></div>
+            <span class="badge" style="background:#fee2e2;color:#991b1b;">${i.quantity}</span>
+          </div>`).join("");
+        
+        const recentOrders = (orders || []).slice(0, 5);
+        document.getElementById("recentOrdersList").innerHTML = recentOrders.length === 0 ?
+          '<p style="color:#6b7280; font-size:14px;">No orders yet</p>' :
+          recentOrders.map(o => `<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #e5e7eb;">
+            <div><div style="font-weight:500;">${o.customer?.name || "-"}</div><div style="font-size:12px;color:#6b7280;">${new Date(o.createdAt).toLocaleDateString()}</div></div>
+            <div><span style="font-weight:500;">$${Number(o.totalAmount).toFixed(2)}</span> <span class="badge">${o.orderStatus}</span></div>
+          </div>`).join("");
+      } catch (err) {
+        console.error("Failed to load dashboard:", err);
+      }
+    }
+    
+    initApp().then(loadDashboard);
+  </script>
+</body>
+</html>

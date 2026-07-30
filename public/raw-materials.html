@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Raw Materials - Celestial Grace Inventory</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <aside class="sidebar">
+    <h2>Celestial Grace</h2>
+    <p>Inventory</p>
+    <nav>
+      <a href="/">Dashboard</a>
+      <a href="/products" data-roles="ADMIN,STAFF">Products</a>
+      <a href="/raw-materials" data-roles="ADMIN,STAFF">Raw Materials</a>
+      <a href="/suppliers" data-roles="ADMIN">Suppliers</a>
+      <a href="/purchase-orders" data-roles="ADMIN">Purchase Orders</a>
+      <a href="/customers" data-roles="ADMIN,STAFF">Customers</a>
+      <a href="/sales-orders" data-roles="ADMIN,STAFF">Sales Orders</a>
+      <a href="/inventory" data-roles="ADMIN,STAFF">Inventory</a>
+      <a href="/bom" data-roles="ADMIN">BOM</a>
+      <a href="/import" data-roles="ADMIN">Import</a>
+      <a href="/admin" data-roles="ADMIN">Admin</a>
+    </nav>
+    <div style="margin-top:auto; padding-top:16px; border-top:1px solid #e5e7eb;">
+      <p style="font-size:13px; font-weight:500;" id="userName"></p>
+      <p style="font-size:11px; color:#6b7280;" id="userRole"></p>
+      <button class="btn" style="width:100%; margin-top:8px;" onclick="logout()">Logout</button>
+    </div>
+  </aside>
+  <main class="main">
+    <div class="top-bar"><h1>Raw Materials</h1><button class="btn btn-primary" onclick="openModal('materialModal')">Add Material</button></div>
+    <div class="card"><table><thead><tr><th>Name</th><th>Category</th><th>Unit</th><th>Cost/Unit</th><th>Threshold</th><th>Actions</th></tr></thead>
+    <tbody id="materialsTable"><tr><td colspan="6" style="text-align:center;color:#6b7280;">Loading...</td></tr></tbody></table></div>
+  </main>
+  <div id="materialModal" class="modal"><div class="modal-content">
+    <h3 id="materialModalTitle">Add Material</h3>
+    <form id="materialForm">
+      <input type="hidden" id="materialId">
+      <label>Name</label><input id="materialName" required>
+      <label>Category</label><input id="materialCategory" required>
+      <label>Unit</label><input id="materialUnit" required>
+      <label>Cost Per Unit</label><input id="materialCost" type="number" step="0.01" required>
+      <label>Low Stock Threshold</label><input id="materialThreshold" type="number" value="10" required>
+      <div style="display:flex; gap:8px; margin-top:12px;"><button type="submit" class="btn btn-primary">Save</button><button type="button" class="btn" onclick="closeModal('materialModal')">Cancel</button></div>
+    </form>
+  </div></div>
+  <script src="/js/api.js"></script><script src="/js/app.js"></script>
+  <script>
+    let editingMaterialId = null;
+    async function loadMaterials() {
+      const data = await api.get("/api/raw-materials");
+      const tbody = document.getElementById("materialsTable");
+      if (!data || data.length === 0) { tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#6b7280;">No materials found</td></tr>'; return; }
+      tbody.innerHTML = data.map(m => `<tr><td>${m.name}</td><td>${m.category}</td><td>${m.unit}</td><td>$${Number(m.costPerUnit).toFixed(2)}</td><td>${m.lowStockThreshold}</td>
+        <td><button class="btn" onclick="editMaterial('${m.id}')">Edit</button> <button class="btn btn-danger" onclick="deleteMaterial('${m.id}')">Delete</button></td></tr>`).join("");
+    }
+    document.getElementById("materialForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const payload = { name: document.getElementById("materialName").value, category: document.getElementById("materialCategory").value, unit: document.getElementById("materialUnit").value, costPerUnit: document.getElementById("materialCost").value, lowStockThreshold: document.getElementById("materialThreshold").value };
+      if (editingMaterialId) { await api.patch(`/api/raw-materials/${editingMaterialId}`, payload); showToast("Material updated"); }
+      else { await api.post("/api/raw-materials", payload); showToast("Material created"); }
+      closeModal("materialModal"); loadMaterials();
+    });
+    async function editMaterial(id) { const m = await api.get(`/api/raw-materials/${id}`); editingMaterialId = id; document.getElementById("materialModalTitle").textContent = "Edit Material"; document.getElementById("materialName").value = m.name; document.getElementById("materialCategory").value = m.category; document.getElementById("materialUnit").value = m.unit; document.getElementById("materialCost").value = m.costPerUnit; document.getElementById("materialThreshold").value = m.lowStockThreshold; openModal("materialModal"); }
+    async function deleteMaterial(id) { if (!confirm("Delete?")) return; await api.delete(`/api/raw-materials/${id}`); showToast("Material deleted"); loadMaterials(); }
+    function openModal(id) { document.getElementById(id).classList.remove("hidden"); }
+    function closeModal(id) { document.getElementById(id).classList.add("hidden"); if (id === "materialModal") { editingMaterialId = null; document.getElementById("materialForm").reset(); document.getElementById("materialModalTitle").textContent = "Add Material"; } }
+    initApp().then(loadMaterials);
+  </script>
+  <style>.modal { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); align-items:center; justify-content:center; } .modal-content { background:#fff; padding:24px; border-radius:8px; width:100%; max-width:480px; } .modal-content label { display:block; font-size:13px; font-weight:500; margin-bottom:4px; margin-top:10px; } .modal-content input { margin-bottom:4px; }</style>
+</body>
+</html>

@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Customers - Celestial Grace Inventory</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <aside class="sidebar">
+    <h2>Celestial Grace</h2>
+    <p>Inventory</p>
+    <nav>
+      <a href="/">Dashboard</a>
+      <a href="/products" data-roles="ADMIN,STAFF">Products</a>
+      <a href="/raw-materials" data-roles="ADMIN,STAFF">Raw Materials</a>
+      <a href="/suppliers" data-roles="ADMIN">Suppliers</a>
+      <a href="/purchase-orders" data-roles="ADMIN">Purchase Orders</a>
+      <a href="/customers" data-roles="ADMIN,STAFF">Customers</a>
+      <a href="/sales-orders" data-roles="ADMIN,STAFF">Sales Orders</a>
+      <a href="/inventory" data-roles="ADMIN,STAFF">Inventory</a>
+      <a href="/bom" data-roles="ADMIN">BOM</a>
+      <a href="/import" data-roles="ADMIN">Import</a>
+      <a href="/admin" data-roles="ADMIN">Admin</a>
+    </nav>
+    <div style="margin-top:auto; padding-top:16px; border-top:1px solid #e5e7eb;">
+      <p style="font-size:13px; font-weight:500;" id="userName"></p>
+      <p style="font-size:11px; color:#6b7280;" id="userRole"></p>
+      <button class="btn" style="width:100%; margin-top:8px;" onclick="logout()">Logout</button>
+    </div>
+  </aside>
+  <main class="main">
+    <div class="top-bar"><h1>Customers</h1><button class="btn btn-primary" onclick="openModal('customerModal')">Add Customer</button></div>
+    <div class="card"><table><thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Address</th><th>Actions</th></tr></thead>
+    <tbody id="customersTable"><tr><td colspan="5" style="text-align:center;color:#6b7280;">Loading...</td></tr></tbody></table></div>
+  </main>
+  <div id="customerModal" class="modal"><div class="modal-content">
+    <h3 id="customerModalTitle">Add Customer</h3>
+    <form id="customerForm">
+      <input type="hidden" id="customerId">
+      <label>Name</label><input id="customerName" required>
+      <label>Email</label><input id="customerEmail" type="email">
+      <label>Phone</label><input id="customerPhone">
+      <label>Address</label><textarea id="customerAddress"></textarea>
+      <div style="display:flex; gap:8px; margin-top:12px;"><button type="submit" class="btn btn-primary">Save</button><button type="button" class="btn" onclick="closeModal('customerModal')">Cancel</button></div>
+    </form>
+  </div></div>
+  <script src="/js/api.js"></script><script src="/js/app.js"></script>
+  <script>
+    let editingCustomerId = null;
+    async function loadCustomers() {
+      const data = await api.get("/api/customers");
+      const tbody = document.getElementById("customersTable");
+      if (!data || data.length === 0) { tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#6b7280;">No customers found</td></tr>'; return; }
+      tbody.innerHTML = data.map(c => `<tr><td>${c.name}</td><td>${c.email || "-"}</td><td>${c.phone || "-"}</td><td>${c.address || "-"}</td>
+        <td><button class="btn" onclick="editCustomer('${c.id}')">Edit</button> <button class="btn btn-danger" onclick="deleteCustomer('${c.id}')">Delete</button></td></tr>`).join("");
+    }
+    document.getElementById("customerForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const payload = { name: document.getElementById("customerName").value, email: document.getElementById("customerEmail").value, phone: document.getElementById("customerPhone").value, address: document.getElementById("customerAddress").value };
+      if (editingCustomerId) { await api.patch(`/api/customers/${editingCustomerId}`, payload); showToast("Customer updated"); }
+      else { await api.post("/api/customers", payload); showToast("Customer created"); }
+      closeModal("customerModal"); loadCustomers();
+    });
+    async function editCustomer(id) { const c = await api.get(`/api/customers/${id}`); editingCustomerId = id; document.getElementById("customerModalTitle").textContent = "Edit Customer"; document.getElementById("customerName").value = c.name; document.getElementById("customerEmail").value = c.email || ""; document.getElementById("customerPhone").value = c.phone || ""; document.getElementById("customerAddress").value = c.address || ""; openModal("customerModal"); }
+    async function deleteCustomer(id) { if (!confirm("Delete?")) return; await api.delete(`/api/customers/${id}`); showToast("Customer deleted"); loadCustomers(); }
+    function openModal(id) { document.getElementById(id).classList.remove("hidden"); }
+    function closeModal(id) { document.getElementById(id).classList.add("hidden"); if (id === "customerModal") { editingCustomerId = null; document.getElementById("customerForm").reset(); document.getElementById("customerModalTitle").textContent = "Add Customer"; } }
+    initApp().then(loadCustomers);
+  </script>
+  <style>.modal { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); align-items:center; justify-content:center; } .modal-content { background:#fff; padding:24px; border-radius:8px; width:100%; max-width:480px; } .modal-content label { display:block; font-size:13px; font-weight:500; margin-bottom:4px; margin-top:10px; } .modal-content input, .modal-content textarea { margin-bottom:4px; }</style>
+</body>
+</html>

@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin - Celestial Grace Inventory</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <aside class="sidebar">
+    <h2>Celestial Grace</h2>
+    <p>Inventory</p>
+    <nav>
+      <a href="/">Dashboard</a>
+      <a href="/products" data-roles="ADMIN,STAFF">Products</a>
+      <a href="/raw-materials" data-roles="ADMIN,STAFF">Raw Materials</a>
+      <a href="/suppliers" data-roles="ADMIN">Suppliers</a>
+      <a href="/purchase-orders" data-roles="ADMIN">Purchase Orders</a>
+      <a href="/customers" data-roles="ADMIN,STAFF">Customers</a>
+      <a href="/sales-orders" data-roles="ADMIN,STAFF">Sales Orders</a>
+      <a href="/inventory" data-roles="ADMIN,STAFF">Inventory</a>
+      <a href="/bom" data-roles="ADMIN">BOM</a>
+      <a href="/import" data-roles="ADMIN">Import</a>
+      <a href="/admin" data-roles="ADMIN">Admin</a>
+    </nav>
+    <div style="margin-top:auto; padding-top:16px; border-top:1px solid #e5e7eb;">
+      <p style="font-size:13px; font-weight:500;" id="userName"></p>
+      <p style="font-size:11px; color:#6b7280;" id="userRole"></p>
+      <button class="btn" style="width:100%; margin-top:8px;" onclick="logout()">Logout</button>
+    </div>
+  </aside>
+  <main class="main">
+    <div class="top-bar"><h1>Admin - Users</h1><button class="btn btn-primary" onclick="openModal('userModal')">Add User</button></div>
+    <div class="card"><table><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Active</th><th>Actions</th></tr></thead>
+    <tbody id="usersTable"><tr><td colspan="5" style="text-align:center;color:#6b7280;">Loading...</td></tr></tbody></table></div>
+  </main>
+  <div id="userModal" class="modal"><div class="modal-content">
+    <h3 id="userModalTitle">Add User</h3>
+    <form id="userForm">
+      <input type="hidden" id="userId">
+      <label>Name</label><input id="userNameInput" required>
+      <label>Email</label><input id="userEmail" type="email" required>
+      <label>Password</label><input id="userPassword" type="password">
+      <label>Role</label><select id="userRoleInput"><option value="STAFF">Staff</option><option value="ADMIN">Admin</option></select>
+      <div style="display:flex; gap:8px; margin-top:12px;"><button type="submit" class="btn btn-primary">Save</button><button type="button" class="btn" onclick="closeModal('userModal')">Cancel</button></div>
+    </form>
+  </div></div>
+  <script src="/js/api.js"></script><script src="/js/app.js"></script>
+  <script>
+    let editingUserId = null;
+    async function loadUsers() {
+      const data = await api.get("/api/users");
+      const tbody = document.getElementById("usersTable");
+      if (!data || data.length === 0) { tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#6b7280;">No users</td></tr>'; return; }
+      tbody.innerHTML = data.map(u => `<tr><td>${u.name}</td><td>${u.email}</td><td>${u.role}</td><td>${u.active ? "Yes" : "No"}</td>
+        <td><button class="btn" onclick="editUser('${u.id}')">Edit</button> <button class="btn" onclick="toggleUser('${u.id}', ${u.active})">${u.active ? "Deactivate" : "Activate"}</button> <button class="btn" onclick="resetPassword('${u.id}')">Reset Password</button></td></tr>`).join("");
+    }
+    document.getElementById("userForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const payload = { name: document.getElementById("userNameInput").value, email: document.getElementById("userEmail").value, password: document.getElementById("userPassword").value || "123456", role: document.getElementById("userRoleInput").value };
+      if (editingUserId) { await api.patch(`/api/users/${editingUserId}`, payload); showToast("User updated"); }
+      else { await api.post("/api/users", payload); showToast("User created"); }
+      closeModal("userModal"); loadUsers();
+    });
+    async function editUser(id) { const u = await api.get(`/api/users/${id}`); editingUserId = id; document.getElementById("userModalTitle").textContent = "Edit User"; document.getElementById("userNameInput").value = u.name; document.getElementById("userEmail").value = u.email; document.getElementById("userRoleInput").value = u.role; openModal("userModal"); }
+    async function toggleUser(id, active) { await api.patch(`/api/users/${id}`, { active: !active }); showToast("User updated"); loadUsers(); }
+    async function resetPassword(id) { if (!confirm("Reset password to 123456?")) return; await api.post(`/api/users/${id}/reset-password`, {}); showToast("Password reset"); }
+    function openModal(id) { document.getElementById(id).classList.remove("hidden"); }
+    function closeModal(id) { document.getElementById(id).classList.add("hidden"); if (id === "userModal") { editingUserId = null; document.getElementById("userForm").reset(); document.getElementById("userModalTitle").textContent = "Add User"; } }
+    initApp().then(loadUsers);
+  </script>
+  <style>.modal { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); align-items:center; justify-content:center; } .modal-content { background:#fff; padding:24px; border-radius:8px; width:100%; max-width:480px; } .modal-content label { display:block; font-size:13px; font-weight:500; margin-bottom:4px; margin-top:10px; } .modal-content input, .modal-content select { margin-bottom:4px; }</style>
+</body>
+</html>

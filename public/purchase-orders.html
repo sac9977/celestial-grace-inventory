@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Purchase Orders - Celestial Grace Inventory</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <aside class="sidebar">
+    <h2>Celestial Grace</h2>
+    <p>Inventory</p>
+    <nav>
+      <a href="/">Dashboard</a>
+      <a href="/products" data-roles="ADMIN,STAFF">Products</a>
+      <a href="/raw-materials" data-roles="ADMIN,STAFF">Raw Materials</a>
+      <a href="/suppliers" data-roles="ADMIN">Suppliers</a>
+      <a href="/purchase-orders" data-roles="ADMIN">Purchase Orders</a>
+      <a href="/customers" data-roles="ADMIN,STAFF">Customers</a>
+      <a href="/sales-orders" data-roles="ADMIN,STAFF">Sales Orders</a>
+      <a href="/inventory" data-roles="ADMIN,STAFF">Inventory</a>
+      <a href="/bom" data-roles="ADMIN">BOM</a>
+      <a href="/import" data-roles="ADMIN">Import</a>
+      <a href="/admin" data-roles="ADMIN">Admin</a>
+    </nav>
+    <div style="margin-top:auto; padding-top:16px; border-top:1px solid #e5e7eb;">
+      <p style="font-size:13px; font-weight:500;" id="userName"></p>
+      <p style="font-size:11px; color:#6b7280;" id="userRole"></p>
+      <button class="btn" style="width:100%; margin-top:8px;" onclick="logout()">Logout</button>
+    </div>
+  </aside>
+  <main class="main">
+    <div class="top-bar"><h1>Purchase Orders</h1><button class="btn btn-primary" onclick="openModal('poModal')">New PO</button></div>
+    <div class="card"><table><thead><tr><th>Reference</th><th>Supplier</th><th>Status</th><th>Payment</th><th>Total</th><th>Actions</th></tr></thead>
+    <tbody id="poTable"><tr><td colspan="6" style="text-align:center;color:#6b7280;">Loading...</td></tr></tbody></table></div>
+  </main>
+  <div id="poModal" class="modal"><div class="modal-content">
+    <h3>New Purchase Order</h3>
+    <form id="poForm">
+      <label>Supplier</label><select id="poSupplier" required></select>
+      <label>Bill Reference</label><input id="poReference" required>
+      <label>Invoice No</label><input id="poInvoice">
+      <label>Bill Type</label><input id="poBillType">
+      <label>Category</label><input id="poCategory">
+      <label>Notes</label><textarea id="poNotes"></textarea>
+      <h4 style="margin-top:16px;">Line Items</h4>
+      <div id="poItems"></div>
+      <button type="button" class="btn" style="margin-top:8px;" onclick="addPoItem()">Add Item</button>
+      <div style="display:flex; gap:8px; margin-top:12px;"><button type="submit" class="btn btn-primary">Create</button><button type="button" class="btn" onclick="closeModal('poModal')">Cancel</button></div>
+    </form>
+  </div></div>
+  <script src="/js/api.js"></script><script src="/js/app.js"></script>
+  <script>
+    let suppliers = [];
+    let materials = [];
+    let poItems = [{ rawMaterialId: "", quantity: "", costPerUnit: "" }];
+
+    async function loadSuppliers() { suppliers = await api.get("/api/suppliers"); }
+    async function loadMaterials() { materials = await api.get("/api/raw-materials"); }
+    async function loadPOs() { const data = await api.get("/api/purchase-orders"); const tbody = document.getElementById("poTable"); if (!data || data.length === 0) { tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#6b7280;">No purchase orders</td></tr>'; return; } tbody.innerHTML = data.map(po => `<tr><td>${po.reference}</td><td>${po.supplier?.name || "-"}</td><td>${po.status}</td><td>${po.paymentStatus}</td><td>${Number(po.grandTotal || 0).toFixed(2)}</td><td><button class="btn" onclick="viewPO('${po.id}')">View</button></td></tr>`).join(""); }
+    async function viewPO(id) { const po = await api.get(`/api/purchase-orders/${id}`); alert(JSON.stringify(po, null, 2)); }
+
+    function renderPoItems() {
+      const container = document.getElementById("poItems");
+      container.innerHTML = poItems.map((item, idx) => `<div style="display:flex; gap:8px; margin-bottom:8px; align-items:center;">
+        <select data-idx="${idx}" class="po-material" style="flex:2;"><option value="">Select material</option>${materials.map(m => `<option value="${m.id}" ${item.rawMaterialId === m.id ? "selected" : ""}>${m.name}</option>`).join("")}</select>
+        <input type="number" placeholder="Qty" value="${item.quantity}" data-idx="${idx}" class="po-qty" style="flex:1;" />
+        <input type="number" placeholder="Rate" value="${item.costPerUnit}" data-idx="${idx}" class="po-rate" style="flex:1;" />
+        <button type="button" class="btn btn-danger" onclick="removePoItem(${idx})">X</button>
+      </div>`).join("");
+    }
+
+    function addPoItem() { poItems.push({ rawMaterialId: "", quantity: "", costPerUnit: "" }); renderPoItems(); }
+    function removePoItem(idx) { poItems.splice(idx, 1); renderPoItems(); }
+
+    document.getElementById("poItems").addEventListener("input", (e) => { const idx = e.target.dataset.idx; if (idx === undefined) return; if (e.target.classList.contains("po-qty")) poItems[idx].quantity = e.target.value; if (e.target.classList.contains("po-rate")) poItems[idx].costPerUnit = e.target.value; });
+
+    document.getElementById("poForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const items = poItems.filter(i => i.rawMaterialId && i.quantity);
+      const payload = { supplierId: document.getElementById("poSupplier").value, reference: document.getElementById("poReference").value, invoiceNo: document.getElementById("poInvoice").value, billType: document.getElementById("poBillType").value, category: document.getElementById("poCategory").value, notes: document.getElementById("poNotes").value, items };
+      await api.post("/api/purchase-orders", payload);
+      showToast("Purchase order created");
+      closeModal("poModal");
+      loadPOs();
+    });
+
+    async function openModal(id) {
+      await loadSuppliers();
+      await loadMaterials();
+      const select = document.getElementById("poSupplier");
+      select.innerHTML = suppliers.map(s => `<option value="${s.id}">${s.name}</option>`).join("");
+      poItems = [{ rawMaterialId: "", quantity: "", costPerUnit: "" }];
+      renderPoItems();
+      document.getElementById(id).classList.remove("hidden");
+    }
+    function closeModal(id) { document.getElementById(id).classList.add("hidden"); }
+    initApp().then(loadPOs);
+  </script>
+  <style>.modal { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); align-items:center; justify-content:center; } .modal-content { background:#fff; padding:24px; border-radius:8px; width:100%; max-width:600px; } .modal-content label { display:block; font-size:13px; font-weight:500; margin-bottom:4px; margin-top:10px; } .modal-content input, .modal-content select, .modal-content textarea { margin-bottom:4px; }</style>
+</body>
+</html>

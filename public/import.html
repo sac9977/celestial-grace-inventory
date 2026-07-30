@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Import - Celestial Grace Inventory</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <aside class="sidebar">
+    <h2>Celestial Grace</h2>
+    <p>Inventory</p>
+    <nav>
+      <a href="/">Dashboard</a>
+      <a href="/products" data-roles="ADMIN,STAFF">Products</a>
+      <a href="/raw-materials" data-roles="ADMIN,STAFF">Raw Materials</a>
+      <a href="/suppliers" data-roles="ADMIN">Suppliers</a>
+      <a href="/purchase-orders" data-roles="ADMIN">Purchase Orders</a>
+      <a href="/customers" data-roles="ADMIN,STAFF">Customers</a>
+      <a href="/sales-orders" data-roles="ADMIN,STAFF">Sales Orders</a>
+      <a href="/inventory" data-roles="ADMIN,STAFF">Inventory</a>
+      <a href="/bom" data-roles="ADMIN">BOM</a>
+      <a href="/import" data-roles="ADMIN">Import</a>
+      <a href="/admin" data-roles="ADMIN">Admin</a>
+    </nav>
+    <div style="margin-top:auto; padding-top:16px; border-top:1px solid #e5e7eb;">
+      <p style="font-size:13px; font-weight:500;" id="userName"></p>
+      <p style="font-size:11px; color:#6b7280;" id="userRole"></p>
+      <button class="btn" style="width:100%; margin-top:8px;" onclick="logout()">Logout</button>
+    </div>
+  </aside>
+  <main class="main">
+    <div class="top-bar"><h1>Excel Import</h1></div>
+    <div class="card">
+      <p>Upload your Excel workbook to import data.</p>
+      <input type="file" id="excelFile" accept=".xlsx,.xls" />
+      <button class="btn btn-primary" style="margin-top:12px;" onclick="runImport()">Import</button>
+      <div id="importResult" style="margin-top:12px;"></div>
+    </div>
+  </main>
+  <script src="/js/api.js"></script><script src="/js/app.js"></script>
+  <script>
+    async function runImport() {
+      const fileInput = document.getElementById("excelFile");
+      const file = fileInput.files[0];
+      if (!file) { alert("Select a file"); return; }
+      const buffer = await file.arrayBuffer();
+      const workbook = XLSX.read(buffer, { type: "array" });
+      const result = { imported: 0, skipped: 0, errors: [] };
+      const sheet4 = workbook.Sheets[Object.keys(workbook.Sheets).find(n => n.toLowerCase().includes("product") || n === "Sheet4")];
+      const sheet2 = workbook.Sheets[Object.keys(workbook.Sheets).find(n => n.toLowerCase().includes("material") || n === "Sheet2")];
+      const sheet3 = workbook.Sheets[Object.keys(workbook.Sheets).find(n => n.toLowerCase().includes("hardware") || n === "Sheet3")];
+      const sheet1 = workbook.Sheets[Object.keys(workbook.Sheets).find(n => n.toLowerCase().includes("purchase") || n === "Sheet1")];
+      if (sheet4) {
+        const rows = XLSX.utils.sheet_to_json(sheet4, { header: 1 });
+        const mapping = { "Bag SKU": "sku", "bag name": "name", "category": "category", "color/ variant": "color", "material": "material", "costPrice": "costPrice", "sellingPrice": "sellingPrice" };
+        const res = await api.post("/api/import/sheet4", { rows, mapping });
+        result.imported += res.imported || 0; result.skipped += res.skipped || 0; result.errors.push(...(res.errors || []));
+      }
+      if (sheet2 || sheet3) {
+        const rows = XLSX.utils.sheet_to_json(sheet2 || sheet3, { header: 1 });
+        const mapping = { "material code": "item code", "material description": "name", "unit": "unit", "rate": "costPerUnit", "color/ variant": "color" };
+        const res = await api.post("/api/import/sheet2-3", { rows, mapping, sheetName: sheet2 ? "Sheet2" : "Sheet3" });
+        result.imported += res.imported || 0; result.skipped += res.skipped || 0; result.errors.push(...(res.errors || []));
+      }
+      if (sheet1) {
+        const rows = XLSX.utils.sheet_to_json(sheet1, { header: 1 });
+        const mapping = { "vendor": "vendor", "Bill Reference": "Bill Reference", "invoice no.": "invoice no.", "bill type": "bill type", "category": "category", "subtotal": "subtotal", "grand total": "grand total" };
+        const res = await api.post("/api/import/sheet1", { rows, mapping });
+        result.imported += res.imported || 0; result.skipped += res.skipped || 0; result.errors.push(...(res.errors || []));
+      }
+      document.getElementById("importResult").innerHTML = `<p><strong>Imported:</strong> ${result.imported}</p><p><strong>Skipped:</strong> ${result.skipped}</p><p><strong>Errors:</strong> ${result.errors.length}</p>`;
+    }
+    initApp();
+  </script>
+</body>
+</html>
