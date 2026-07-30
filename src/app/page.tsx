@@ -1,3 +1,3 @@
-export default function Page() {
-  return null
-}
+import DashboardPage from "./(dashboard)/page"
+
+export default DashboardPage
