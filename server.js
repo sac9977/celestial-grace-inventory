@@ -643,7 +643,7 @@ app.post("/api/import/sheet1", requireAuth, async (req, res) => {
       const existing = await prisma.purchaseOrder.findFirst({ where: { reference: String(reference), supplierId: supplier.id } })
       if (existing) { skipped++; continue }
       await prisma.purchaseOrder.create({
-        data: { supplierId: supplier.id, reference: String(reference), invoiceNo: getVal("invoice no.") ? String(getVal("invoice no.")) : null, billType: getVal("bill type") ? String(getVal("bill type")) : null, category: getVal("category") ? String(getVal("category")) : null, paymentStatus: (getVal("payment status") ? String(getVal("payment status")).toUpperCase() : "UNPAID") as any, subtotal: Number(getVal("subtotal") || 0), taxAmount: Number(getVal("SGST") || 0) + Number(getVal("CGST") || 0), grandTotal: Number(getVal("grand total") || 0), notes: getVal("remarks") ? String(getVal("remarks")) : null },
+        data: { supplierId: supplier.id, reference: String(reference), invoiceNo: getVal("invoice no.") ? String(getVal("invoice no.")) : null, billType: getVal("bill type") ? String(getVal("bill type")) : null, category: getVal("category") ? String(getVal("category")) : null, paymentStatus: getVal("payment status") ? String(getVal("payment status")).toUpperCase() : "UNPAID", subtotal: Number(getVal("subtotal") || 0), taxAmount: Number(getVal("SGST") || 0) + Number(getVal("CGST") || 0), grandTotal: Number(getVal("grand total") || 0), notes: getVal("remarks") ? String(getVal("remarks")) : null },
       })
       imported++
     } catch (err) {
@@ -653,7 +653,7 @@ app.post("/api/import/sheet1", requireAuth, async (req, res) => {
   res.json({ imported, skipped, errors })
 })
 
-app.get("*", requireAuth, (req, res) => {
+app.use(requireAuth, (req, res) => {
   const file = req.path === "/" ? "index.html" : `${req.path}.html`
   const filePath = path.join(__dirname, "public", file)
   res.sendFile(filePath, (err) => {
